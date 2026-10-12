@@ -1,0 +1,499 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Checklist</title>
+<style>
+  :root {
+    --bg: #f5f6f8; --card: #ffffff; --text: #1f2430; --muted: #5b6270;
+    --line: #e3e6eb; --accent: #2563eb; --hl: #dbeafe;
+    --high: #b91c1c; --high-bg: #fee2e2;
+    --medium: #92400e; --medium-bg: #fef3c7;
+    --low: #166534; --low-bg: #dcfce7;
+    --warn-bg: #fef3c7; --warn: #92400e;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #14161b; --card: #1e2128; --text: #e6e8ec; --muted: #9aa1ad;
+      --line: #2e323b; --accent: #60a5fa; --hl: #1e3a5f;
+      --high: #fca5a5; --high-bg: #4a1d1d;
+      --medium: #fcd34d; --medium-bg: #453411;
+      --low: #86efac; --low-bg: #163322;
+      --warn-bg: #453411; --warn: #fcd34d;
+    }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; padding: 24px 16px 80px; background: var(--bg); color: var(--text);
+    font-family: "Segoe UI", system-ui, -apple-system, sans-serif; font-size: 16px;
+  }
+  main { max-width: 900px; margin: 0 auto; }
+  h1 { margin: 0 0 4px; font-size: 1.6rem; }
+  #summary { margin: 0 0 16px; color: var(--muted); font-size: 0.9rem; min-height: 1.3em; }
+
+  input[type="text"], input[type="date"], select, button {
+    font: inherit; color: inherit; padding: 8px 10px;
+    border: 1px solid var(--line); border-radius: 6px; background: var(--card);
+  }
+  button { cursor: pointer; }
+  button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+  :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+  #add-form { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 12px; }
+  #new-name { flex: 1 1 220px; min-width: 0; }
+
+  .toolbar { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-bottom: 12px; font-size: 0.9rem; }
+  .toolbar .spacer { flex: 1; }
+  .toolbar button, .toolbar select { padding: 6px 10px; font-size: 0.9rem; }
+  .toolbar button[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: #fff; }
+  .toolbar label { color: var(--muted); }
+
+  .notice { background: var(--warn-bg); color: var(--warn); padding: 8px 12px; border-radius: 6px; margin-bottom: 12px; font-size: 0.9rem; }
+
+  .table-wrap { background: var(--card); border: 1px solid var(--line); border-radius: 8px; overflow-x: auto; }
+  table { width: 100%; border-collapse: collapse; }
+  th, td { padding: 8px 12px; text-align: left; border-bottom: 1px solid var(--line); vertical-align: middle; }
+  tr:last-child td { border-bottom: none; }
+  th { font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.04em; color: var(--muted); white-space: nowrap; }
+  .col-done { width: 64px; text-align: center; }
+  .col-no { width: 56px; }
+  .col-priority { width: 130px; }
+  .col-due { width: 160px; }
+  .col-actions { width: 170px; text-align: right; white-space: nowrap; }
+  td.col-no { color: var(--muted); font-variant-numeric: tabular-nums; }
+  td.name { overflow-wrap: anywhere; min-width: 160px; }
+  td input[type="checkbox"] { width: 22px; height: 22px; cursor: pointer; accent-color: var(--accent); }
+  td input.edit { width: 100%; }
+
+  select.priority { padding: 4px 8px; border: none; border-radius: 999px; font-size: 0.85rem; font-weight: 600; }
+  select.priority.high { color: var(--high); background: var(--high-bg); }
+  select.priority.medium { color: var(--medium); background: var(--medium-bg); }
+  select.priority.low { color: var(--low); background: var(--low-bg); }
+  input.due { padding: 4px 6px; font-size: 0.85rem; }
+  tr.overdue input.due { color: var(--high); border-color: var(--high); }
+
+  tr.done .name { text-decoration: line-through; color: var(--muted); }
+  tr.done select.priority { color: var(--muted); background: var(--line); }
+  tr.new { animation: flash 1.6s ease-out; }
+  @keyframes flash { from { background: var(--hl); } to { background: transparent; } }
+  @media (prefers-reduced-motion: reduce) { tr.new { animation: none; background: var(--hl); } }
+
+  button.icon {
+    border: none; background: none; color: var(--muted);
+    min-width: 40px; min-height: 40px; padding: 0; font-size: 1.15rem; border-radius: 6px;
+  }
+  button.icon:hover { color: var(--text); background: var(--bg); }
+  button.icon.del:hover { color: var(--high); }
+  button.icon:disabled { opacity: 0.3; cursor: default; }
+  #empty { padding: 28px 12px; text-align: center; color: var(--muted); }
+
+  #toast {
+    position: fixed; left: 50%; bottom: 20px; transform: translateX(-50%);
+    background: var(--text); color: var(--bg); padding: 10px 14px; border-radius: 8px;
+    display: flex; gap: 12px; align-items: center; max-width: calc(100% - 32px); box-shadow: 0 4px 16px rgba(0,0,0,.25);
+  }
+  #toast[hidden] { display: none; }
+  #toast button { background: none; border: 1px solid currentColor; color: inherit; padding: 4px 10px; }
+  .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Checklist</h1>
+  <p id="summary" aria-live="polite"></p>
+  <div id="storage-warning" class="notice" role="alert" hidden>
+    Your browser is blocking storage, so changes won't be saved after you close this page. Use Export to keep a copy.
+  </div>
+
+  <form id="add-form">
+    <input type="text" id="new-name" placeholder="Item name" aria-label="Item name" maxlength="200" required>
+    <select id="new-priority" aria-label="Priority">
+      <option value="high">High</option>
+      <option value="medium" selected>Medium</option>
+      <option value="low">Low</option>
+    </select>
+    <input type="date" id="new-due" aria-label="Due date (optional)">
+    <button type="submit" class="primary">Add item</button>
+  </form>
+
+  <div class="toolbar">
+    <span role="group" aria-label="Filter">
+      <button type="button" data-filter="all" aria-pressed="true">All</button>
+      <button type="button" data-filter="active" aria-pressed="false">Active</button>
+      <button type="button" data-filter="done" aria-pressed="false">Done</button>
+    </span>
+    <label for="sort-mode">Order</label>
+    <select id="sort-mode">
+      <option value="auto">Priority (automatic)</option>
+      <option value="manual">Manual (use ▲ ▼)</option>
+    </select>
+    <span class="spacer"></span>
+    <button type="button" id="clear-done">Clear completed</button>
+    <button type="button" id="export">Export</button>
+    <button type="button" id="import">Import</button>
+    <input type="file" id="import-file" accept="application/json,.json" hidden>
+  </div>
+
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th class="col-done">Done</th>
+          <th class="col-no">No.</th>
+          <th>Item Name</th>
+          <th class="col-priority">Priority</th>
+          <th class="col-due">Due</th>
+          <th class="col-actions"><span class="sr-only">Actions</span></th>
+        </tr>
+      </thead>
+      <tbody id="rows"></tbody>
+    </table>
+    <div id="empty"></div>
+  </div>
+</main>
+<div id="toast" role="status" hidden><span id="toast-msg"></span><button type="button" id="toast-action" hidden></button></div>
+
+<script>
+  const STORAGE_KEY = "checklist-items";
+  const PREFS_KEY = "checklist-prefs";
+  const PRIORITY_ORDER = { high: 0, medium: 1, low: 2 };
+  const PRIORITY_LABEL = { high: "High", medium: "Medium", low: "Low" };
+
+  let items = load();
+  let prefs = loadPrefs();
+  let editingId = null;
+  let highlightId = null;
+  let toastTimer = null;
+
+  // ---------- storage ----------
+  // Validate everything read from storage or an imported file; drop what can't be used.
+  function sanitize(raw) {
+    if (!Array.isArray(raw)) return [];
+    const seen = new Set();
+    const clean = [];
+    for (const r of raw) {
+      if (!r || typeof r.name !== "string" || !r.name.trim()) continue;
+      let id = typeof r.id === "string" && r.id && !seen.has(r.id) ? r.id : newId();
+      seen.add(id);
+      clean.push({
+        id,
+        seq: Number.isInteger(r.seq) && r.seq > 0 ? r.seq : 0,
+        name: r.name.trim().slice(0, 200),
+        priority: r.priority in PRIORITY_ORDER ? r.priority : "medium",
+        due: typeof r.due === "string" && /^\d{4}-\d{2}-\d{2}$/.test(r.due) ? r.due : "",
+        done: r.done === true
+      });
+    }
+    // Give every item a permanent number; unnumbered (older) items get the next free ones.
+    const used = new Set();
+    let max = 0;
+    for (const it of clean) {
+      if (it.seq && !used.has(it.seq)) { used.add(it.seq); max = Math.max(max, it.seq); } else it.seq = 0;
+    }
+    for (const it of clean) if (!it.seq) it.seq = ++max;
+    return clean;
+  }
+
+  function newId() {
+    return (crypto.randomUUID ? crypto.randomUUID() : Date.now().toString(36) + Math.random().toString(36).slice(2));
+  }
+
+  function load() {
+    try { return sanitize(JSON.parse(localStorage.getItem(STORAGE_KEY))); }
+    catch { return []; }
+  }
+
+  function loadPrefs() {
+    try {
+      const p = JSON.parse(localStorage.getItem(PREFS_KEY)) || {};
+      return {
+        filter: ["all", "active", "done"].includes(p.filter) ? p.filter : "all",
+        sort: p.sort === "manual" ? "manual" : "auto"
+      };
+    } catch { return { filter: "all", sort: "auto" }; }
+  }
+
+  function save() {
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(items));
+      localStorage.setItem(PREFS_KEY, JSON.stringify(prefs));
+      document.getElementById("storage-warning").hidden = true;
+    } catch {
+      document.getElementById("storage-warning").hidden = false;
+    }
+  }
+
+  // Keep several open tabs in sync.
+  window.addEventListener("storage", e => {
+    if (e.key === STORAGE_KEY) { items = load(); render(); }
+    else if (e.key === PREFS_KEY) { prefs = loadPrefs(); render(); }
+  });
+
+  // ---------- helpers ----------
+  function today() {
+    const d = new Date();
+    return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0");
+  }
+
+  function nextSeq() { return items.reduce((m, i) => Math.max(m, i.seq), 0) + 1; }
+
+  // Unchecked first, then priority, then due date (undated last), then name.
+  function autoCompare(a, b) {
+    return (a.done - b.done) ||
+      (PRIORITY_ORDER[a.priority] - PRIORITY_ORDER[b.priority]) ||
+      (a.due || "9999").localeCompare(b.due || "9999") ||
+      a.name.localeCompare(b.name, undefined, { sensitivity: "base", numeric: true });
+  }
+
+  function visibleItems() {
+    let list = items.filter(i =>
+      prefs.filter === "all" || (prefs.filter === "done" ? i.done : !i.done));
+    if (prefs.sort === "auto") list = list.slice().sort(autoCompare);
+    return list;
+  }
+
+  function showToast(message, actionLabel, action) {
+    const toast = document.getElementById("toast");
+    const btn = document.getElementById("toast-action");
+    document.getElementById("toast-msg").textContent = message;
+    btn.hidden = !actionLabel;
+    btn.textContent = actionLabel || "";
+    btn.onclick = () => { hideToast(); if (action) action(); };
+    toast.hidden = false;
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(hideToast, 7000);
+  }
+  function hideToast() { document.getElementById("toast").hidden = true; }
+
+  function iconButton(label, text, extraClass, onClick, id, kind) {
+    const b = document.createElement("button");
+    b.type = "button";
+    b.className = "icon " + (extraClass || "");
+    b.textContent = text;
+    b.title = label;
+    b.setAttribute("aria-label", label);
+    b.dataset.id = id; b.dataset.k = kind;
+    b.addEventListener("click", onClick);
+    return b;
+  }
+
+  // ---------- render ----------
+  function render() {
+    // Remember keyboard focus so rebuilding the table doesn't lose it.
+    const active = document.activeElement;
+    const focusSpec = active && active.dataset && active.dataset.id ? { id: active.dataset.id, k: active.dataset.k } : null;
+
+    const list = visibleItems();
+    const manual = prefs.sort === "manual";
+    const tbody = document.getElementById("rows");
+    tbody.innerHTML = "";
+    const todayStr = today();
+
+    list.forEach((item, index) => {
+      const tr = document.createElement("tr");
+      if (item.done) tr.classList.add("done");
+      if (!item.done && item.due && item.due < todayStr) tr.classList.add("overdue");
+      if (item.id === highlightId) tr.classList.add("new");
+      tr.dataset.rowId = item.id;
+
+      const doneCell = document.createElement("td");
+      doneCell.className = "col-done";
+      const checkbox = document.createElement("input");
+      checkbox.type = "checkbox";
+      checkbox.checked = item.done;
+      checkbox.dataset.id = item.id; checkbox.dataset.k = "done";
+      checkbox.setAttribute("aria-label", "Mark " + item.name + " as done");
+      checkbox.addEventListener("change", () => { item.done = checkbox.checked; update(); });
+      doneCell.appendChild(checkbox);
+
+      const no = document.createElement("td");
+      no.className = "col-no";
+      no.textContent = item.seq;
+
+      const name = document.createElement("td");
+      name.className = "name";
+      if (editingId === item.id) {
+        const input = document.createElement("input");
+        input.type = "text"; input.className = "edit"; input.maxLength = 200;
+        input.value = item.name;
+        input.dataset.id = item.id; input.dataset.k = "edit";
+        input.setAttribute("aria-label", "Edit name of " + item.name);
+        const finish = commit => {
+          if (editingId !== item.id) return;
+          editingId = null;
+          const v = input.value.trim();
+          if (commit && v && v !== item.name) { item.name = v; update(); } else render();
+        };
+        input.addEventListener("keydown", e => {
+          if (e.key === "Enter") { e.preventDefault(); finish(true); }
+          else if (e.key === "Escape") { e.preventDefault(); finish(false); }
+        });
+        input.addEventListener("blur", () => finish(true));
+        name.appendChild(input);
+        queueMicrotask(() => { input.focus(); input.select(); });
+      } else {
+        name.textContent = item.name;
+        name.title = "Double-click to edit";
+        name.addEventListener("dblclick", () => startEdit(item.id));
+      }
+
+      const priorityCell = document.createElement("td");
+      const select = document.createElement("select");
+      select.className = "priority " + item.priority;
+      select.dataset.id = item.id; select.dataset.k = "priority";
+      select.setAttribute("aria-label", "Priority for " + item.name);
+      for (const key of Object.keys(PRIORITY_ORDER)) {
+        select.add(new Option(PRIORITY_LABEL[key], key, false, key === item.priority));
+      }
+      select.addEventListener("change", () => { item.priority = select.value; update(); });
+      priorityCell.appendChild(select);
+
+      const dueCell = document.createElement("td");
+      const due = document.createElement("input");
+      due.type = "date"; due.className = "due"; due.value = item.due;
+      due.dataset.id = item.id; due.dataset.k = "due";
+      due.setAttribute("aria-label", "Due date for " + item.name);
+      due.addEventListener("change", () => { item.due = due.value; update(); });
+      dueCell.appendChild(due);
+
+      const actions = document.createElement("td");
+      actions.className = "col-actions";
+      if (manual) {
+        const pos = items.indexOf(item);
+        const up = iconButton("Move " + item.name + " up", "▲", "", () => move(item, -1), item.id, "up");
+        const down = iconButton("Move " + item.name + " down", "▼", "", () => move(item, 1), item.id, "down");
+        up.disabled = pos === 0; down.disabled = pos === items.length - 1;
+        actions.append(up, down);
+      }
+      actions.append(
+        iconButton("Edit " + item.name, "✎", "", () => startEdit(item.id), item.id, "editbtn"),
+        iconButton("Remove " + item.name, "×", "del", () => remove(item), item.id, "del")
+      );
+
+      tr.append(doneCell, no, name, priorityCell, dueCell, actions);
+      tbody.appendChild(tr);
+    });
+
+    const empty = document.getElementById("empty");
+    empty.hidden = list.length > 0;
+    empty.textContent = items.length === 0
+      ? "No items yet. Add your first item above."
+      : "No " + (prefs.filter === "done" ? "completed" : "active") + " items.";
+
+    const doneCount = items.filter(i => i.done).length;
+    document.getElementById("summary").textContent =
+      items.length ? doneCount + " of " + items.length + " completed" : "";
+    document.getElementById("clear-done").disabled = doneCount === 0;
+    document.getElementById("sort-mode").value = prefs.sort;
+    document.querySelectorAll("[data-filter]").forEach(b =>
+      b.setAttribute("aria-pressed", String(b.dataset.filter === prefs.filter)));
+
+    if (focusSpec && editingId === null) {
+      const el = document.querySelector('[data-id="' + CSS.escape(focusSpec.id) + '"][data-k="' + focusSpec.k + '"]');
+      if (el && !el.disabled) el.focus();
+    }
+    if (highlightId) {
+      const row = tbody.querySelector('[data-row-id="' + CSS.escape(highlightId) + '"]');
+      if (row) row.scrollIntoView({ block: "nearest", behavior: "smooth" });
+      highlightId = null;
+    }
+  }
+
+  function update() { save(); render(); }
+
+  // ---------- actions ----------
+  function startEdit(id) { editingId = id; render(); }
+
+  function move(item, delta) {
+    const from = items.indexOf(item), to = from + delta;
+    if (to < 0 || to >= items.length) return;
+    items.splice(from, 1);
+    items.splice(to, 0, item);
+    update();
+  }
+
+  function remove(item) {
+    const index = items.indexOf(item);
+    items.splice(index, 1);
+    update();
+    showToast("Removed “" + item.name + "”", "Undo", () => {
+      items.splice(Math.min(index, items.length), 0, item);
+      update();
+    });
+  }
+
+  document.getElementById("add-form").addEventListener("submit", event => {
+    event.preventDefault();
+    const nameInput = document.getElementById("new-name");
+    const name = nameInput.value.trim();
+    if (!name) return;
+    const duplicate = items.some(i => i.name.toLowerCase() === name.toLowerCase());
+    const item = {
+      id: newId(), seq: nextSeq(), name,
+      priority: document.getElementById("new-priority").value,
+      due: document.getElementById("new-due").value,
+      done: false
+    };
+    items.push(item);
+    // Make sure the new item is visible even under the "Done" filter.
+    if (prefs.filter === "done") prefs.filter = "all";
+    highlightId = item.id;
+    nameInput.value = "";
+    document.getElementById("new-due").value = "";
+    nameInput.focus();
+    update();
+    if (duplicate) showToast("An item named “" + name + "” already exists; added anyway.");
+  });
+
+  document.querySelectorAll("[data-filter]").forEach(b =>
+    b.addEventListener("click", () => { prefs.filter = b.dataset.filter; update(); }));
+
+  document.getElementById("sort-mode").addEventListener("change", e => {
+    prefs.sort = e.target.value === "manual" ? "manual" : "auto";
+    update();
+  });
+
+  document.getElementById("clear-done").addEventListener("click", () => {
+    const removed = items.filter(i => i.done);
+    if (!removed.length) return;
+    const before = items.slice();
+    items = items.filter(i => !i.done);
+    update();
+    showToast("Cleared " + removed.length + " completed item" + (removed.length === 1 ? "" : "s"), "Undo", () => {
+      items = before; update();
+    });
+  });
+
+  document.getElementById("export").addEventListener("click", () => {
+    const blob = new Blob([JSON.stringify(items, null, 2)], { type: "application/json" });
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = "checklist-" + today() + ".json";
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+  });
+
+  const importFile = document.getElementById("import-file");
+  document.getElementById("import").addEventListener("click", () => importFile.click());
+  importFile.addEventListener("change", async () => {
+    const file = importFile.files[0];
+    importFile.value = "";
+    if (!file) return;
+    try {
+      const imported = sanitize(JSON.parse(await file.text()));
+      if (!imported.length) { showToast("No valid items found in that file."); return; }
+      if (items.length && !confirm("Replace your current " + items.length + " item(s) with " + imported.length + " imported item(s)?")) return;
+      const before = items;
+      items = imported;
+      update();
+      showToast("Imported " + imported.length + " item(s)", "Undo", () => { items = before; update(); });
+    } catch {
+      showToast("Couldn't read that file. Is it a checklist export?");
+    }
+  });
+
+  render();
+</script>
+</body>
+</html>
